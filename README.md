@@ -22,3 +22,5 @@ results demonstrate that the hybrid framework achieves a 15–20% reduction in t
 a 10–15% increase in the robustness margin, significantly reducing the likelihood of blackouts. By reducing energy loss by up to 50% and improving overall system reliability to 92%,
 this framework provides a cost-effective and resilient solution for sustainable electrification
 in data-scarce and off-grid regions.
+
+LINK TO PROJECT: https://microgrid-optimizer.netlify.app/
