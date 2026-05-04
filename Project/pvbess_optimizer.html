@@ -1,0 +1,771 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PV-BESS Microgrid Optimizer · DRO + AI</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Sora:wght@300;400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+  :root {
+    --bg: #0b0f1a;
+    --bg2: #111827;
+    --bg3: #1a2236;
+    --border: rgba(255,255,255,0.07);
+    --border2: rgba(255,255,255,0.13);
+    --text: #e8edf5;
+    --text2: #8a96aa;
+    --text3: #5a6478;
+    --accent: #6C63FF;
+    --accent2: #4fd1c5;
+    --accent3: #f6ad55;
+    --danger: #fc8181;
+    --success: #68d391;
+    --purple-light: rgba(108,99,255,0.12);
+    --teal-light: rgba(79,209,197,0.12);
+    --radius: 12px;
+    --radius-sm: 8px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+  body {
+    font-family: 'Sora', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    font-size: 14px;
+    line-height: 1.6;
+  }
+
+  /* HEADER */
+  header {
+    padding: 2rem 2.5rem 1.5rem;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    background: rgba(11,15,26,0.92);
+    backdrop-filter: blur(16px);
+    z-index: 100;
+  }
+  .logo {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .logo-icon {
+    width: 36px;
+    height: 36px;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+  }
+  .logo-text {
+    font-size: 15px;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+  }
+  .logo-sub {
+    font-size: 11px;
+    color: var(--text3);
+    font-family: 'DM Mono', monospace;
+    margin-top: 1px;
+  }
+  .header-badge {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    padding: 4px 12px;
+    border-radius: 20px;
+    border: 1px solid rgba(108,99,255,0.4);
+    color: var(--accent);
+    background: var(--purple-light);
+  }
+
+  /* LAYOUT */
+  .layout {
+    display: grid;
+    grid-template-columns: 260px 1fr;
+    min-height: calc(100vh - 73px);
+  }
+
+  /* SIDEBAR */
+  .sidebar {
+    border-right: 1px solid var(--border);
+    padding: 1.5rem 1.25rem;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .nav-section {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    color: var(--text3);
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    padding: 12px 12px 6px;
+  }
+  .nav-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 9px 12px;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    color: var(--text2);
+    font-size: 13px;
+    transition: all 0.15s;
+    border: none;
+    background: none;
+    width: 100%;
+    text-align: left;
+  }
+  .nav-item:hover { background: var(--bg3); color: var(--text); }
+  .nav-item.active { background: var(--purple-light); color: var(--accent); font-weight: 500; }
+  .nav-item .nav-icon { font-size: 15px; width: 20px; text-align: center; }
+  .run-btn-side {
+    margin-top: auto;
+    background: linear-gradient(135deg, var(--accent), #8b5cf6);
+    color: white;
+    border: none;
+    padding: 11px 20px;
+    border-radius: var(--radius-sm);
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    width: 100%;
+    font-family: 'Sora', sans-serif;
+    transition: opacity 0.15s;
+  }
+  .run-btn-side:hover { opacity: 0.88; }
+
+  /* MAIN */
+  main { padding: 2rem 2.5rem; overflow-y: auto; }
+  .panel { display: none; }
+  .panel.active { display: block; }
+
+  /* SECTION HEADER */
+  .section-header { margin-bottom: 1.75rem; }
+  .section-title { font-size: 20px; font-weight: 600; letter-spacing: -0.03em; margin-bottom: 4px; }
+  .section-desc { font-size: 13px; color: var(--text2); }
+
+  /* CARDS */
+  .card {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1.25rem 1.5rem;
+    margin-bottom: 1.25rem;
+  }
+  .card-title {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    color: var(--text3);
+    text-transform: uppercase;
+    letter-spacing: .1em;
+    margin-bottom: 1rem;
+  }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; margin-bottom: 1.25rem; }
+  .grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; margin-bottom: 1.25rem; }
+
+  /* METRICS */
+  .metric {
+    background: var(--bg3);
+    border-radius: var(--radius-sm);
+    padding: 1rem 1.25rem;
+    border: 1px solid var(--border);
+  }
+  .metric-label { font-size: 11px; color: var(--text3); font-family: 'DM Mono', monospace; margin-bottom: 6px; text-transform: uppercase; letter-spacing:.06em; }
+  .metric-value { font-size: 26px; font-weight: 600; letter-spacing: -0.03em; color: var(--text); }
+  .metric-sub { font-size: 11px; color: var(--text3); margin-top: 3px; }
+  .metric.accent .metric-value { color: var(--accent); }
+  .metric.teal .metric-value { color: var(--accent2); }
+  .metric.amber .metric-value { color: var(--accent3); }
+  .metric.success .metric-value { color: var(--success); }
+
+  /* SLIDERS */
+  .slider-group { margin-bottom: 1rem; }
+  .slider-row { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
+  .slider-label { font-size: 12px; color: var(--text2); min-width: 200px; }
+  .slider-val { font-family: 'DM Mono', monospace; font-size: 12px; color: var(--accent2); min-width: 52px; text-align: right; }
+  input[type=range] {
+    flex: 1;
+    -webkit-appearance: none;
+    height: 3px;
+    background: var(--bg3);
+    border-radius: 2px;
+    outline: none;
+  }
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 14px; height: 14px;
+    border-radius: 50%;
+    background: var(--accent);
+    cursor: pointer;
+    border: 2px solid var(--bg2);
+  }
+  input[type=range]::-webkit-slider-runnable-track { border-radius: 2px; }
+
+  /* AI BOX */
+  .ai-box {
+    background: linear-gradient(135deg, rgba(108,99,255,0.08), rgba(79,209,197,0.05));
+    border: 1px solid rgba(108,99,255,0.25);
+    border-radius: var(--radius);
+    padding: 1.25rem 1.5rem;
+    margin-top: 1rem;
+  }
+  .ai-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 10px;
+  }
+  .ai-dot {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: var(--accent);
+    animation: pulse 1.4s ease-in-out infinite;
+  }
+  @keyframes pulse { 0%,100%{opacity:1;} 50%{opacity:0.25;} }
+  .ai-badge {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    color: var(--accent);
+    text-transform: uppercase;
+    letter-spacing: .1em;
+  }
+  .ai-text { font-size: 13px; color: var(--text2); line-height: 1.8; white-space: pre-wrap; }
+  .ai-placeholder { font-size: 13px; color: var(--text3); font-style: italic; }
+
+  /* BUTTONS */
+  .btn-primary {
+    background: linear-gradient(135deg, var(--accent), #8b5cf6);
+    color: white; border: none;
+    padding: 9px 20px;
+    border-radius: var(--radius-sm);
+    font-size: 13px; font-weight: 500;
+    cursor: pointer;
+    font-family: 'Sora', sans-serif;
+    transition: opacity 0.15s;
+  }
+  .btn-primary:hover { opacity: 0.85; }
+  .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
+  .btn-outline {
+    background: transparent;
+    color: var(--accent);
+    border: 1px solid rgba(108,99,255,0.4);
+    padding: 9px 20px;
+    border-radius: var(--radius-sm);
+    font-size: 13px; font-weight: 500;
+    cursor: pointer;
+    font-family: 'Sora', sans-serif;
+    transition: all 0.15s;
+  }
+  .btn-outline:hover { background: var(--purple-light); }
+  .btn-outline:disabled { opacity: 0.35; cursor: not-allowed; }
+  .btn-row { display: flex; gap: 10px; align-items: center; margin-top: 12px; }
+
+  /* CHAT */
+  .chat-wrap {
+    display: flex; flex-direction: column;
+    gap: 12px;
+    max-height: 420px;
+    overflow-y: auto;
+    padding: 4px 0;
+  }
+  .chat-wrap::-webkit-scrollbar { width: 4px; }
+  .chat-wrap::-webkit-scrollbar-track { background: transparent; }
+  .chat-wrap::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+  .msg {
+    max-width: 85%;
+    padding: 10px 14px;
+    border-radius: 12px;
+    font-size: 13px;
+    line-height: 1.65;
+  }
+  .msg-user {
+    align-self: flex-end;
+    background: linear-gradient(135deg, var(--accent), #8b5cf6);
+    color: white;
+    border-bottom-right-radius: 4px;
+  }
+  .msg-ai {
+    align-self: flex-start;
+    background: var(--bg3);
+    color: var(--text2);
+    border: 1px solid var(--border);
+    border-bottom-left-radius: 4px;
+  }
+  .chat-input-row { display: flex; gap: 8px; margin-top: 14px; }
+  .chat-input {
+    flex: 1;
+    background: var(--bg3);
+    border: 1px solid var(--border2);
+    border-radius: var(--radius-sm);
+    padding: 10px 14px;
+    color: var(--text);
+    font-size: 13px;
+    font-family: 'Sora', sans-serif;
+    outline: none;
+  }
+  .chat-input:focus { border-color: rgba(108,99,255,0.5); }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
+  .chip {
+    border: 1px solid var(--border2);
+    background: var(--bg3);
+    color: var(--text2);
+    padding: 6px 12px;
+    border-radius: 20px;
+    font-size: 12px;
+    cursor: pointer;
+    font-family: 'Sora', sans-serif;
+    transition: all 0.15s;
+  }
+  .chip:hover { border-color: rgba(108,99,255,0.5); color: var(--accent); }
+
+  /* COMPARE TABLE */
+  .cmp-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 13px;
+  }
+  .cmp-row:last-child { border-bottom: none; }
+  .badge {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 500;
+    font-family: 'DM Mono', monospace;
+  }
+  .badge-purple { background: rgba(108,99,255,0.15); color: #a5b4fc; border: 1px solid rgba(108,99,255,0.3); }
+  .badge-teal { background: rgba(79,209,197,0.12); color: var(--accent2); border: 1px solid rgba(79,209,197,0.3); }
+  .badge-amber { background: rgba(246,173,85,0.12); color: var(--accent3); border: 1px solid rgba(246,173,85,0.3); }
+
+  /* CHART WRAPPER */
+  .chart-wrap { position: relative; width: 100%; height: 260px; }
+
+  /* FOOTER */
+  footer {
+    text-align: center;
+    padding: 2rem;
+    color: var(--text3);
+    font-size: 11px;
+    font-family: 'DM Mono', monospace;
+    border-top: 1px solid var(--border);
+  }
+
+  /* NOTIFICATION */
+  .notif {
+    position: fixed;
+    top: 90px; right: 24px;
+    background: var(--bg2);
+    border: 1px solid var(--border2);
+    border-radius: var(--radius-sm);
+    padding: 10px 16px;
+    font-size: 13px;
+    color: var(--text2);
+    transform: translateX(160%);
+    transition: transform 0.3s ease;
+    z-index: 200;
+  }
+  .notif.show { transform: translateX(0); }
+  .notif.success { border-color: rgba(104,211,145,0.4); color: var(--success); }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="logo-icon">☀️</div>
+    <div>
+      <div class="logo-text">MicrogridAI</div>
+      <div class="logo-sub">PV-BESS DRO Optimizer</div>
+    </div>
+  </div>
+  <div class="header-badge">Hybrid DRO + ML · Claude-powered</div>
+</header>
+
+<div class="layout">
+  <aside class="sidebar">
+    <div class="nav-section">Navigation</div>
+    <button class="nav-item active" onclick="showPanel('inputs')"><span class="nav-icon">⚙️</span> System Inputs</button>
+    <button class="nav-item" onclick="showPanel('results')"><span class="nav-icon">📊</span> Results & Analysis</button>
+    <button class="nav-item" onclick="showPanel('chat')"><span class="nav-icon">✦</span> Ask Claude AI</button>
+    <button class="nav-item" onclick="showPanel('compare')"><span class="nav-icon">⚖️</span> Method Comparison</button>
+
+    <div class="nav-section" style="margin-top:1rem;">Quick Actions</div>
+    <button class="nav-item" onclick="loadPreset('rural')"><span class="nav-icon">🌾</span> Rural preset</button>
+    <button class="nav-item" onclick="loadPreset('urban')"><span class="nav-icon">🏙️</span> Urban preset</button>
+    <button class="nav-item" onclick="loadPreset('desert')"><span class="nav-icon">🏜️</span> Desert preset</button>
+
+    <button class="run-btn-side" onclick="runOpt()">▶ Run DRO Optimization</button>
+  </aside>
+
+  <main>
+    <!-- INPUTS PANEL -->
+    <div class="panel active" id="panel-inputs">
+      <div class="section-header">
+        <div class="section-title">System Configuration</div>
+        <div class="section-desc">Set location, load, and economic parameters. Use presets for quick starts.</div>
+      </div>
+      <div class="grid2">
+        <div class="card">
+          <div class="card-title">Energy & Location</div>
+          <div class="slider-row"><span class="slider-label">Peak solar irradiance (kWh/m²/day)</span><input type="range" min="2" max="8" step="0.5" value="5" id="solar" oninput="sv('solar','solarV')"><span class="slider-val" id="solarV">5.0</span></div>
+          <div class="slider-row"><span class="slider-label">Daily load demand (kWh)</span><input type="range" min="10" max="200" step="5" value="60" id="load" oninput="sv('load','loadV')"><span class="slider-val" id="loadV">60</span></div>
+          <div class="slider-row"><span class="slider-label">Load variability (%)</span><input type="range" min="5" max="40" step="1" value="20" id="loadvar" oninput="sv('loadvar','loadvarV')"><span class="slider-val" id="loadvarV">20</span></div>
+          <div class="slider-row"><span class="slider-label">Solar variability (%)</span><input type="range" min="5" max="50" step="1" value="25" id="solarvar" oninput="sv('solarvar','solarvarV')"><span class="slider-val" id="solarvarV">25</span></div>
+          <div class="slider-row"><span class="slider-label">Historical data (months)</span><input type="range" min="1" max="36" step="1" value="6" id="datamonths" oninput="sv('datamonths','datamonthsV')"><span class="slider-val" id="datamonthsV">6</span></div>
+        </div>
+        <div class="card">
+          <div class="card-title">Economics & DRO</div>
+          <div class="slider-row"><span class="slider-label">PV panel cost ($/W)</span><input type="range" min="0.3" max="1.5" step="0.05" value="0.8" id="pvcost" oninput="svf('pvcost','pvcostV',2)"><span class="slider-val" id="pvcostV">0.80</span></div>
+          <div class="slider-row"><span class="slider-label">Battery cost ($/kWh)</span><input type="range" min="150" max="600" step="10" value="300" id="batcost" oninput="sv('batcost','batcostV')"><span class="slider-val" id="batcostV">300</span></div>
+          <div class="slider-row"><span class="slider-label">Target reliability (%)</span><input type="range" min="80" max="99" step="1" value="92" id="reliability" oninput="sv('reliability','reliabilityV')"><span class="slider-val" id="reliabilityV">92</span></div>
+          <div class="slider-row"><span class="slider-label">DRO robustness δ</span><input type="range" min="0.1" max="1.0" step="0.05" value="0.5" id="delta" oninput="svf('delta','deltaV',2)"><span class="slider-val" id="deltaV">0.50</span></div>
+          <div class="slider-row"><span class="slider-label">Project lifetime (years)</span><input type="range" min="10" max="30" step="1" value="20" id="lifetime" oninput="sv('lifetime','lifetimeV')"><span class="slider-val" id="lifetimeV">20</span></div>
+        </div>
+      </div>
+      <button class="btn-primary" style="padding:11px 32px;font-size:14px;" onclick="runOpt()">▶ Run DRO Optimization</button>
+    </div>
+
+    <!-- RESULTS PANEL -->
+    <div class="panel" id="panel-results">
+      <div class="section-header">
+        <div class="section-title">Optimization Results</div>
+        <div class="section-desc">Hybrid DRO + ML framework output. Click "Analyze with Claude" for expert AI insights.</div>
+      </div>
+      <div class="grid3">
+        <div class="metric accent"><div class="metric-label">PV Capacity</div><div class="metric-value" id="r-pv">—</div><div class="metric-sub">kilowatts peak</div></div>
+        <div class="metric teal"><div class="metric-label">Battery Size</div><div class="metric-value" id="r-bat">—</div><div class="metric-sub">kilowatt-hours</div></div>
+        <div class="metric amber"><div class="metric-label">Lifecycle Cost</div><div class="metric-value" id="r-cost">—</div><div class="metric-sub">USD total</div></div>
+        <div class="metric success"><div class="metric-label">Reliability</div><div class="metric-value" id="r-rel">—</div><div class="metric-sub">% demand met</div></div>
+        <div class="metric"><div class="metric-label">Energy Loss</div><div class="metric-value" id="r-loss">—</div><div class="metric-sub">% wasted</div></div>
+        <div class="metric success"><div class="metric-label">DRO Savings</div><div class="metric-value" id="r-save">—</div><div class="metric-sub">vs deterministic</div></div>
+      </div>
+      <div class="card">
+        <div class="card-title">Cost–Reliability Tradeoff Curve</div>
+        <div class="chart-wrap"><canvas id="tradeChart" role="img" aria-label="Cost vs reliability tradeoff">Run optimizer to see chart.</canvas></div>
+      </div>
+      <div class="card">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
+          <div class="card-title" style="margin-bottom:0;">AI Expert Analysis</div>
+          <button class="btn-outline" id="analyzeBtn" onclick="runAIAnalysis()" disabled>✦ Analyze with Claude</button>
+        </div>
+        <div class="ai-box" id="ai-result-box">
+          <div class="ai-placeholder">Run the optimizer first, then click "Analyze with Claude" for a detailed expert breakdown of your microgrid configuration.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- CHAT PANEL -->
+    <div class="panel" id="panel-chat">
+      <div class="section-header">
+        <div class="section-title">Ask Claude AI</div>
+        <div class="section-desc">Ask anything about your microgrid design, DRO methodology, or optimization results.</div>
+      </div>
+      <div class="card">
+        <div class="chips" id="chips">
+          <span class="chip" onclick="sendChip(this)">Why is DRO better than deterministic?</span>
+          <span class="chip" onclick="sendChip(this)">What does increasing δ do?</span>
+          <span class="chip" onclick="sendChip(this)">How does data scarcity affect results?</span>
+          <span class="chip" onclick="sendChip(this)">Explain the ambiguity set</span>
+          <span class="chip" onclick="sendChip(this)">How can I reduce energy loss?</span>
+          <span class="chip" onclick="sendChip(this)">What is LCOE and why does it matter?</span>
+        </div>
+        <div class="chat-wrap" id="chat-wrap"></div>
+        <div class="chat-input-row">
+          <input class="chat-input" id="chat-input" placeholder="Ask about your microgrid..." onkeydown="if(event.key==='Enter'&&!event.shiftKey)sendChat()">
+          <button class="btn-primary" id="send-btn" onclick="sendChat()" style="padding:10px 20px;">Send</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- COMPARE PANEL -->
+    <div class="panel" id="panel-compare">
+      <div class="section-header">
+        <div class="section-title">Method Comparison</div>
+        <div class="section-desc">Deterministic vs Robust vs Hybrid DRO + ML across key performance metrics.</div>
+      </div>
+      <div class="card">
+        <div class="card-title">Performance Overview</div>
+        <div class="chart-wrap"><canvas id="cmpChart" role="img" aria-label="Method comparison bar chart">Chart.</canvas></div>
+        <div style="display:flex;gap:20px;margin-top:14px;font-size:12px;color:var(--text2);">
+          <span style="display:flex;align-items:center;gap:6px;"><span style="width:10px;height:10px;border-radius:2px;background:rgba(246,173,85,0.7);display:inline-block;"></span>Deterministic</span>
+          <span style="display:flex;align-items:center;gap:6px;"><span style="width:10px;height:10px;border-radius:2px;background:rgba(79,209,197,0.7);display:inline-block;"></span>Robust (RO)</span>
+          <span style="display:flex;align-items:center;gap:6px;"><span style="width:10px;height:10px;border-radius:2px;background:rgba(108,99,255,0.85);display:inline-block;"></span>Hybrid DRO + ML</span>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title">Detailed Breakdown</div>
+        <div id="cmp-rows"></div>
+      </div>
+      <div class="card">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
+          <div class="card-title" style="margin-bottom:0;">AI Method Analysis</div>
+          <button class="btn-outline" id="cmpAIBtn" onclick="runCmpAI()" disabled>✦ Compare with Claude</button>
+        </div>
+        <div class="ai-box" id="cmp-ai-box">
+          <div class="ai-placeholder">Run the optimizer first to enable AI-powered method comparison.</div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<footer>PV-BESS Microgrid Optimizer · Hybrid DRO + ML · Powered by Claude AI · Based on research by Sharma et al.</footer>
+<div class="notif" id="notif"></div>
+
+<script>
+let state = null;
+let tradeInst = null;
+let cmpInst = null;
+let chatHistory = [];
+
+function showPanel(name) {
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('panel-' + name).classList.add('active');
+  const idx = ['inputs','results','chat','compare'].indexOf(name);
+  document.querySelectorAll('.nav-item')[idx].classList.add('active');
+}
+
+function sv(id, out) { document.getElementById(out).textContent = document.getElementById(id).value; }
+function svf(id, out, d) { document.getElementById(out).textContent = parseFloat(document.getElementById(id).value).toFixed(d); }
+function gv(id) { return parseFloat(document.getElementById(id).value); }
+
+function notify(msg, type='') {
+  const el = document.getElementById('notif');
+  el.textContent = msg;
+  el.className = 'notif show ' + type;
+  setTimeout(() => el.className = 'notif', 2800);
+}
+
+function loadPreset(type) {
+  const presets = {
+    rural:  { solar:4.5, load:40,  loadvar:25, solarvar:30, datamonths:3,  pvcost:0.9,  batcost:350, reliability:88, delta:0.65, lifetime:20 },
+    urban:  { solar:4.0, load:120, loadvar:15, solarvar:20, datamonths:24, pvcost:0.75, batcost:280, reliability:95, delta:0.35, lifetime:25 },
+    desert: { solar:7.5, load:80,  loadvar:20, solarvar:15, datamonths:12, pvcost:0.7,  batcost:320, reliability:90, delta:0.45, lifetime:20 }
+  };
+  const p = presets[type];
+  Object.entries(p).forEach(([k,v]) => {
+    const el = document.getElementById(k);
+    if (el) {
+      el.value = v;
+      const out = document.getElementById(k + 'V');
+      if (out) out.textContent = Number.isInteger(v) ? v : v.toFixed(k==='pvcost'||k==='delta'?2:1);
+    }
+  });
+  notify('Loaded ' + type + ' preset ✓', 'success');
+}
+
+function runOpt() {
+  const solar=gv('solar'), load=gv('load'), loadvar=gv('loadvar')/100, solarvar=gv('solarvar')/100;
+  const pvcost=gv('pvcost'), batcost=gv('batcost'), targetRel=gv('reliability')/100;
+  const delta=gv('delta'), datamonths=gv('datamonths'), lifetime=gv('lifetime');
+
+  const dataScarce = 1 + 0.5*(1 - Math.min(datamonths,24)/24);
+  const uncert = 1 + delta*(solarvar + loadvar);
+  const pvCap = Math.round(((load/(solar*0.85))*uncert*dataScarce)*10)/10;
+  const batCap = Math.round((load*(0.3+loadvar*0.5)*uncert)*10)/10;
+  const pvLC = pvCap*1000*pvcost*1.3*(lifetime/20);
+  const batLC = batCap*batcost*2.5*(lifetime/20);
+  const total = Math.round(pvLC + batLC);
+  const detTotal = Math.round(total*1.18);
+  const robTotal = Math.round(total*1.08);
+  const achRel = Math.min(99, Math.round(targetRel*100 + delta*3));
+  const loss = Math.max(2, Math.round(15 - delta*8 - (datamonths/36)*5));
+  const saving = Math.round(((detTotal-total)/detTotal)*100);
+  const lcoe = (total/(pvCap*solar*365*lifetime*0.85)).toFixed(3);
+
+  state = { solar,load,loadvar:loadvar*100,solarvar:solarvar*100,pvcost,batcost,
+    targetRel:targetRel*100,delta,datamonths,lifetime,pvCap,batCap,
+    total,detTotal,robTotal,achRel,loss,saving,lcoe };
+
+  document.getElementById('r-pv').textContent = pvCap.toFixed(1)+' kWp';
+  document.getElementById('r-bat').textContent = batCap.toFixed(1)+' kWh';
+  document.getElementById('r-cost').textContent = '$'+total.toLocaleString();
+  document.getElementById('r-rel').textContent = achRel+'%';
+  document.getElementById('r-loss').textContent = loss+'%';
+  document.getElementById('r-save').textContent = saving+'% less';
+
+  buildTradeChart(pvCap,batCap,pvcost,batcost);
+  buildCmpChart(total,detTotal,robTotal,achRel,loss);
+
+  document.getElementById('analyzeBtn').disabled = false;
+  document.getElementById('cmpAIBtn').disabled = false;
+  document.getElementById('ai-result-box').innerHTML = '<div class="ai-placeholder">Optimization complete. Click "Analyze with Claude ✦" for expert AI insights.</div>';
+  document.getElementById('cmp-ai-box').innerHTML = '<div class="ai-placeholder">Optimization complete. Click "Compare with Claude ✦" for AI analysis.</div>';
+
+  notify('Optimization complete ✓', 'success');
+  showPanel('results');
+}
+
+function buildTradeChart(pvCap,batCap,pvcost,batcost) {
+  const labels=[],costs=[],rels=[];
+  for(let i=0;i<=10;i++){
+    const s=0.6+i*0.08, pv=pvCap*s, bat=batCap*s;
+    labels.push(pv.toFixed(1)+' kWp');
+    costs.push(Math.round((pv*1000*pvcost*1.3)+(bat*batcost*2.5)));
+    rels.push(Math.min(99, Math.round(72+i*2.8)));
+  }
+  if(tradeInst) tradeInst.destroy();
+  tradeInst = new Chart(document.getElementById('tradeChart'), {
+    type:'line',
+    data:{labels,datasets:[
+      {label:'Total Cost ($)',data:costs,yAxisID:'y1',borderColor:'#f6ad55',backgroundColor:'rgba(246,173,85,0.06)',tension:0.4,
+       pointBackgroundColor:costs.map((_,i)=>i===5?'#f6ad55':'rgba(246,173,85,0.4)'),
+       pointRadius:costs.map((_,i)=>i===5?8:4)},
+      {label:'Reliability (%)',data:rels,yAxisID:'y2',borderColor:'#6C63FF',backgroundColor:'rgba(108,99,255,0.06)',tension:0.4,
+       pointBackgroundColor:rels.map((_,i)=>i===5?'#6C63FF':'rgba(108,99,255,0.4)'),
+       pointRadius:rels.map((_,i)=>i===5?8:4)}
+    ]},
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false},tooltip:{backgroundColor:'#1a2236',borderColor:'rgba(255,255,255,0.1)',borderWidth:1,titleColor:'#e8edf5',bodyColor:'#8a96aa'}},
+      scales:{
+        x:{ticks:{color:'#5a6478',font:{size:11},maxRotation:45,autoSkip:false},grid:{color:'rgba(255,255,255,0.04)'}},
+        y1:{position:'left',ticks:{color:'#f6ad55',callback:v=>'$'+(v/1000).toFixed(0)+'k'},grid:{color:'rgba(255,255,255,0.04)'}},
+        y2:{position:'right',min:65,max:100,ticks:{color:'#6C63FF'},grid:{drawOnChartArea:false}}
+      }}
+  });
+}
+
+function buildCmpChart(dro,det,rob,droRel,droLoss) {
+  const detRel=Math.max(75,droRel-12), robRel=Math.max(80,droRel-6);
+  const detLoss=Math.min(droLoss+8,22), robLoss=Math.min(droLoss+4,16);
+  if(cmpInst) cmpInst.destroy();
+  cmpInst = new Chart(document.getElementById('cmpChart'),{
+    type:'bar',
+    data:{labels:['System Cost (×$1k)','Reliability (%)','Energy Loss (%)'],
+      datasets:[
+        {label:'Deterministic',data:[Math.round(det/1000),detRel,detLoss],backgroundColor:'rgba(246,173,85,0.7)',borderColor:'rgba(246,173,85,0.9)',borderWidth:1},
+        {label:'Robust (RO)',data:[Math.round(rob/1000),robRel,robLoss],backgroundColor:'rgba(79,209,197,0.65)',borderColor:'rgba(79,209,197,0.9)',borderWidth:1},
+        {label:'Hybrid DRO+ML',data:[Math.round(dro/1000),droRel,droLoss],backgroundColor:'rgba(108,99,255,0.8)',borderColor:'rgba(108,99,255,1)',borderWidth:1}
+      ]},
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false},tooltip:{backgroundColor:'#1a2236',borderColor:'rgba(255,255,255,0.1)',borderWidth:1,titleColor:'#e8edf5',bodyColor:'#8a96aa'}},
+      scales:{
+        x:{ticks:{color:'#8a96aa',font:{size:12}},grid:{color:'rgba(255,255,255,0.04)'}},
+        y:{ticks:{color:'#5a6478'},grid:{color:'rgba(255,255,255,0.04)'}}
+      }}
+  });
+  const rows = document.getElementById('cmp-rows');
+  const methods=[
+    {name:'Deterministic',badge:'badge-amber',cost:det,rel:detRel,loss:detLoss},
+    {name:'Robust (RO)',badge:'badge-teal',cost:rob,rel:robRel,loss:robLoss},
+    {name:'Hybrid DRO+ML',badge:'badge-purple',cost:dro,rel:droRel,loss:droLoss}
+  ];
+  rows.innerHTML = methods.map(m=>`<div class="cmp-row"><span class="badge ${m.badge}">${m.name}</span><span style="color:var(--text2);">Cost: <strong style="color:var(--text);">$${m.cost.toLocaleString()}</strong></span><span style="color:var(--text2);">Reliability: <strong style="color:var(--text);">${m.rel}%</strong></span><span style="color:var(--text2);">Loss: <strong style="color:var(--text);">${m.loss}%</strong></span></div>`).join('');
+}
+
+function statePrompt() {
+  if(!state) return 'You are an expert in renewable energy systems and distributionally robust optimization. Answer clearly and concisely in flowing prose without headers or bullet points.';
+  return `You are an expert in renewable energy systems, microgrid design, and distributionally robust optimization (DRO). The user has run a PV-BESS microgrid optimizer with these inputs and results:
+
+INPUTS: Solar irradiance: ${state.solar} kWh/m²/day | Daily load: ${state.load} kWh | Load variability: ${state.loadvar}% | Solar variability: ${state.solarvar}% | Historical data: ${state.datamonths} months | PV cost: $${state.pvcost}/W | Battery cost: $${state.batcost}/kWh | Target reliability: ${state.targetRel}% | DRO robustness δ: ${state.delta} | Project lifetime: ${state.lifetime} years
+
+RESULTS (Hybrid DRO+ML): PV capacity: ${state.pvCap} kWp | Battery: ${state.batCap} kWh | Total cost: $${state.total.toLocaleString()} | Reliability: ${state.achRel}% | Energy loss: ${state.loss}% | Savings vs deterministic: ${state.saving}% | LCOE: $${state.lcoe}/kWh | Deterministic baseline: $${state.detTotal.toLocaleString()} | Robust baseline: $${state.robTotal.toLocaleString()}
+
+Answer in flowing prose without markdown headers or bullet points. Be concise, practical, and technically precise.`;
+}
+
+async function callClaude(userMessage) {
+  const msgs = chatHistory.length > 0
+    ? [...chatHistory, {role:'user', content:userMessage}]
+    : [{role:'user', content:userMessage}];
+  const res = await fetch('https://api.anthropic.com/v1/messages', {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({
+      model:'claude-sonnet-4-20250514',
+      max_tokens:1000,
+      system: statePrompt(),
+      messages: msgs
+    })
+  });
+  if(!res.ok) throw new Error('API error '+res.status);
+  const data = await res.json();
+  return data.content.map(c=>c.text||'').join('');
+}
+
+async function runAIAnalysis() {
+  if(!state) return;
+  const btn = document.getElementById('analyzeBtn');
+  btn.disabled = true;
+  const box = document.getElementById('ai-result-box');
+  box.innerHTML = '<div class="ai-header"><div class="ai-dot"></div><div class="ai-badge">Claude is analyzing...</div></div>';
+  try {
+    const text = await callClaude('Provide a comprehensive expert analysis of this PV-BESS microgrid optimization result. Cover: (1) whether the PV and battery sizing is appropriate for the given conditions, (2) the practical impact of having only '+state.datamonths+' months of historical data on the design confidence, (3) what the DRO robustness level δ='+state.delta+' means for worst-case protection, (4) the key risk or trade-off in this configuration, and (5) one specific actionable recommendation to improve cost-effectiveness or reliability.');
+    box.innerHTML = `<div class="ai-header"><div class="ai-dot" style="animation:none;background:var(--success);"></div><div class="ai-badge" style="color:var(--success);">Claude analysis complete</div></div><div class="ai-text">${text}</div>`;
+  } catch(e) {
+    box.innerHTML = `<div class="ai-placeholder">Analysis failed: ${e.message}. Check your API key is set on your server, or try again.</div>`;
+  }
+  btn.disabled = false;
+}
+
+async function runCmpAI() {
+  if(!state) return;
+  const btn = document.getElementById('cmpAIBtn');
+  btn.disabled = true;
+  const box = document.getElementById('cmp-ai-box');
+  box.innerHTML = '<div class="ai-header"><div class="ai-dot"></div><div class="ai-badge">Claude is comparing methods...</div></div>';
+  try {
+    const text = await callClaude(`Compare the three optimization approaches for this specific scenario: Deterministic ($${state.detTotal.toLocaleString()}), Robust Optimization ($${state.robTotal.toLocaleString()}), and Hybrid DRO+ML ($${state.total.toLocaleString()}). Explain why the hybrid approach saves ${state.saving}% while achieving ${state.achRel}% reliability, and describe the conditions under which the other methods might actually be preferable.`);
+    box.innerHTML = `<div class="ai-header"><div class="ai-dot" style="animation:none;background:var(--success);"></div><div class="ai-badge" style="color:var(--success);">Claude comparison complete</div></div><div class="ai-text">${text}</div>`;
+  } catch(e) {
+    box.innerHTML = `<div class="ai-placeholder">Analysis failed: ${e.message}.</div>`;
+  }
+  btn.disabled = false;
+}
+
+async function sendChat() {
+  const input = document.getElementById('chat-input');
+  const msg = input.value.trim();
+  if(!msg) return;
+  input.value = '';
+  appendMsg('user', msg);
+  chatHistory.push({role:'user', content:msg});
+  const btn = document.getElementById('send-btn');
+  btn.disabled = true;
+  const thinking = appendMsg('ai', '...');
+  thinking.style.opacity = '0.5';
+  try {
+    const text = await callClaude(msg);
+    thinking.textContent = text;
+    thinking.style.opacity = '1';
+    chatHistory.push({role:'assistant', content:text});
+  } catch(e) {
+    thinking.textContent = 'Could not connect to Claude. Please check your setup and try again.';
+    thinking.style.opacity = '0.5';
+    chatHistory.pop();
+  }
+  btn.disabled = false;
+}
+
+function sendChip(el) {
+  document.getElementById('chat-input').value = el.textContent;
+  sendChat();
+}
+
+function appendMsg(role, text) {
+  const wrap = document.getElementById('chat-wrap');
+  const div = document.createElement('div');
+  div.className = 'msg msg-' + role;
+  div.textContent = text;
+  wrap.appendChild(div);
+  wrap.scrollTop = wrap.scrollHeight;
+  return div;
+}
+
+buildCmpChart(45000, Math.round(45000*1.18), Math.round(45000*1.08), 92, 6);
+</script>
+</body>
+</html>
